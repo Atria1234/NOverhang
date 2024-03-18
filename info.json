@@ -1,0 +1,11 @@
+{
+	"name": "NOverhang",
+	"version": "1.0.0",
+	"factorio_version": "1.1",
+	"title": "No Overhang",
+	"author": "Atria",
+	"contact": "tomas.chmelik2@gmail.com",
+	"homepage": "https://github.com/Atria1234/NOverhang",
+	"description": "Crops entity image if it exceeds entity's collision box",
+	"dependencies": []
+}
