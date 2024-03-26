@@ -9,7 +9,7 @@ local function process_entity_type(entity_type, properties, rotate_bounding_box)
     if NOverhang.should_process_entity_type(entity_type) then
         local exclude = NOverhang.excluded_entity_names_from_processing(entity_type)
         for name, entity in pairs(data.raw[entity_type]) do
-            if not exclude[name] then
+            if not exclude[name] and entity.selection_box then
                 log('Processing type: "'..entity_type..'", name: "'..name..'"')
                 local entity_bounding_box = BoundingBox:from_bounding_box(entity.selection_box)
                 if rotate_bounding_box then
