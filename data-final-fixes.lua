@@ -74,6 +74,14 @@ process_entity_type('mining-drill', {
 process_entity_type('reactor', {
     picture = processing.process_sprite_1
 })
+process_entity_type('roboport', {
+    base = processing.process_sprite_1,
+    base_patch = processing.process_sprite_1,
+    base_animation = processing.process_animation_1,
+    door_animation_up = processing.process_animation_1,
+    door_animation_down = processing.process_animation_1,
+    recharging_animation = processing.process_sprite_1
+})
 process_entity_type('storage-tank', {
     pictures = processing.process_storage_tank
 })

@@ -13,21 +13,23 @@ NOverhang.mod_name = 'NOverhang'
 --- | 'lab'
 --- | 'mining-drill'
 --- | 'reactor'
+--- | 'roboport'
 --- | 'storage-tank'
 
 --- @type SupportedEntityType[]
 NOverhang.entity_types = {
-	'accumulator',
-	'assembling-machine',
-	'beacon',
-	'boiler',
-	'burner-generator',
-	'furnace',
-	'generator',
-	'lab',
-	'mining-drill',
+    'accumulator',
+    'assembling-machine',
+    'beacon',
+    'boiler',
+    'burner-generator',
+    'furnace',
+    'generator',
+    'lab',
+    'mining-drill',
     'reactor',
-    --'storage-tank'
+    'roboport',
+    'storage-tank'
 }
 
 --- @param entity_type SupportedEntityType

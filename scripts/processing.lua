@@ -653,6 +653,10 @@ end
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_storage_tank(data, entity_bounding_box)
     process_functions.process_sprite_4(data.picture, entity_bounding_box)
+    process_functions.process_sprite_1(data.window_background, entity_bounding_box)
+    process_functions.process_sprite_1(data.fluid_background, entity_bounding_box)
+    process_functions.process_sprite_1(data.flow_sprite, entity_bounding_box)
+    process_functions.process_animation_1(data.gas_flow, entity_bounding_box)
 end
 
 --- https://lua-api.factorio.com/latest/types/TransportBeltAnimationSet.html
