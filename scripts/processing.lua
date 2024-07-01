@@ -96,14 +96,26 @@ end
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_sprite_4(data, entity_bounding_box)
 	if data.sheets then
-		for _, sprite_sheet in ipairs(data.sheets) do
-			process_functions.process_sprite_n_sheet(sprite_sheet, entity_bounding_box, 4)
-		end
-	elseif data.sheet then
-        if data.sheet.frames ~= 4 then
-            log('Not 4 frames: '..(data.sheet.frames or 'nil'))
+        local sprites = {}
+		for layer_index, sprite_sheet in ipairs(data.sheets) do
+            local sheet_sprites = process_functions.convert_sprite_n_sheet_to_sprites(sprite_sheet, entity_bounding_box, 4)
+            for sprite_index, sprite in ipairs(sheet_sprites) do
+                sprites[sprite_index] = sprites[sprite_index] or { layers = {} }
+                sprites[sprite_index].layers[layer_index] = sprite
+            end
         end
-		process_functions.process_sprite_n_sheet(data.sheet, entity_bounding_box, 4)
+        data.sheets = nil
+        data.north = sprites[1]
+        data.east = sprites[2] or sprites[1]
+        data.south = sprites[3] or sprites[1]
+        data.west = sprites[4] or sprites[2] or sprites[1]
+	elseif data.sheet then
+        local sprites = process_functions.convert_sprite_n_sheet_to_sprites(data.sheet, entity_bounding_box, 4)
+        data.sheet = nil
+        data.north = sprites[1]
+        data.east = sprites[2] or sprites[1]
+        data.south = sprites[3] or sprites[1]
+        data.west = sprites[4] or sprites[2] or sprites[1]
     elseif data.filename or data.layers then
         process_functions.process_sprite_1(data, entity_bounding_box)
     else
@@ -134,14 +146,9 @@ end
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_sprite_8(data, entity_bounding_box)
 	if data.sheets then
-		for _, sprite_sheet in ipairs(data.sheets) do
-			process_functions.process_sprite_n_sheet(sprite_sheet, entity_bounding_box, 8)
-		end
+        error('Processing Sprite8Way with sheets. Not implemented because it wasn\'t encountered so far. Contact mod author with details with name of entity which was processed (visible in Factorio log) and from which mod the entity is.')
 	elseif data.sheet then
-        if data.sheet.frames ~= 8 then
-            log('Not 8 frames: '..(data.sheet.frames or 'nil'))
-        end
-		process_functions.process_sprite_n_sheet(data.sheet, entity_bounding_box, 8)
+        error('Processing Sprite8Way with sheet. Not implemented because it wasn\'t encountered so far. Contact mod author with details with name of entity which was processed (visible in Factorio log) and from which mod the entity is.')
 	else
 		local directions = {
 			'north',
@@ -164,16 +171,28 @@ end
 --- https://lua-api.factorio.com/latest/types/SpriteNWaySheet.html
 --- @param data data.SpriteNWaySheet
 --- @param entity_bounding_box ExtendedBoundingBox
---- @param n integer
-function process_functions.process_sprite_n_sheet(data, entity_bounding_box, n)
+--- @param n integer | nil
+--- @return data.Sprite[]
+function process_functions.convert_sprite_n_sheet_to_sprites(data, entity_bounding_box, n)
+    --- @type data.Sprite[]
+    local hr_versions = {}
 	if data.hr_version then
-        process_functions.process_sprite_n_sheet(data.hr_version, entity_bounding_box, n)
+        hr_versions = process_functions.convert_sprite_n_sheet_to_sprites(data.hr_version, entity_bounding_box, n)
     end
 
-    for i = 1, data.frames or n do
-        -- TODO convert to sheets with single frame, and test
+    local sprites = {}
+    for i = 1, data.frames or n or 1 do
+        --- @type data.SpriteNWaySheet
+        local sheet_copy = table.deepcopy(data)
+        sheet_copy.frames = nil
+
+        --- @type data.Sprite
+        local sprite = sheet_copy
+        sprite.hr_version = hr_versions[i] or nil
+        process_sprite_parameters(sprite, math.fmod(i, 2) == 1 and entity_bounding_box or entity_bounding_box:rotate(), i - 1)
+        table.insert(sprites, sprite)
     end
-    process_sprite_parameters(data, entity_bounding_box)
+    return sprites
 end
 
 --- https://lua-api.factorio.com/latest/types/SpriteSheet.html
@@ -670,11 +689,33 @@ function process_functions.process_transport_belt_animation_set(data, entity_bou
     end
 end
 
+--- @param animation data.Animation
+--- @param shift Vector
+function move_animation(animation, shift)
+    if animation.layers then
+        for _, layer in ipairs(animation.layers) do
+            layer.shift = layer.shift or {0, 0}
+            layer.shift = {
+                (layer.shift[1] or layer.shift.x) + (shift[1] or shift.x),
+                (layer.shift[2] or layer.shift.y) + (shift[2] or shift.y)
+            }
+        end
+    else
+        if animation.hr_version then
+            move_animation(animation.hr_version, shift)
+        end
+        animation.shift = animation.shift or {0, 0}
+        animation.shift = {
+            (animation.shift[1] or animation.shift.x) + (shift[1] or shift.x),
+            (animation.shift[2] or animation.shift.y) + (shift[2] or shift.y)
+        }
+    end
+end
+
 --- https://lua-api.factorio.com/latest/types/WorkingVisualisation.html
 --- @param data data.WorkingVisualisation
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_working_visualisation(data, entity_bounding_box)
-    -- TODO mozna orotovat bounding box
     local directions = {
         'north',
         'west',
@@ -683,19 +724,13 @@ function process_functions.process_working_visualisation(data, entity_bounding_b
     }
 
     for _, direction in ipairs(directions) do
-        local animation = data[direction..'_animation'] or data.animation
+        local animation = data.animation or data[direction..'_animation']
         if animation then
             local position = data[direction..'_position'] or {0, 0}
-            animation.shift = animation.shift or {0, 0}
-            animation.shift = {
-                (animation.shift[1] or animation.shift.x or 0) + (position[1] or position.x or 0),
-                (animation.shift[2] or animation.shift.y or 0) + (position[2] or position.y or 0)
-            }
+            move_animation(animation, position)
             process_functions.process_animation_1(animation, entity_bounding_box)
-            animation.shift = {
-                (animation.shift[1] or animation.shift.x) - (position[1] or position.x),
-                (animation.shift[2] or animation.shift.y) - (position[2] or position.y)
-            }
+            position = {-(position[1] or position.x), -(position[2] or position.y)}
+            move_animation(animation, position)
         end
     end
 end
