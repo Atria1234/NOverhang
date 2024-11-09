@@ -1,6 +1,8 @@
 local pixel_utils = require('scripts.pixel-utils')
 local BoundingBox = require('scripts.bounding-box')
 
+local not_implemented_error_message = 'Not implemented because it wasn\'t encountered so far. Contact mod author with details with name of entity which was processed (visible in Factorio log) and from which mod the entity is.'
+
 --- @param data data.SpriteParameters
 --- @param entity_bounding_box ExtendedBoundingBox
 --- @return ExtendedBoundingBox | nil | false
@@ -141,24 +143,32 @@ function process_functions.process_sprite_4(data, entity_bounding_box)
 	end
 end
 
---- https://lua-api.factorio.com/latest/types/Sprite8Way.html
+--- https://lua-api.factorio.com/latest/types/Sprite16Way.html
 --- @param data data.Sprite8Way
 --- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_sprite_8(data, entity_bounding_box)
+function process_functions.process_sprite_16(data, entity_bounding_box)
 	if data.sheets then
-        error('Processing Sprite8Way with sheets. Not implemented because it wasn\'t encountered so far. Contact mod author with details with name of entity which was processed (visible in Factorio log) and from which mod the entity is.')
+        error('Processing Sprite8Way with sheets. '..not_implemented_error_message)
 	elseif data.sheet then
-        error('Processing Sprite8Way with sheet. Not implemented because it wasn\'t encountered so far. Contact mod author with details with name of entity which was processed (visible in Factorio log) and from which mod the entity is.')
+        error('Processing Sprite8Way with sheet. '..not_implemented_error_message)
 	else
 		local directions = {
 			'north',
+			'north_north_east',
 			'north_east',
+			'east_north_east',
 			'east',
+			'east_south_east',
 			'south_east',
+			'south_south_east',
 			'south',
+			'south_south_west',
 			'south_west',
+			'west_south_west',
 			'west',
-			'north_west'
+			'west_north_west',
+			'north_west',
+			'north_north_west'
 		}
 		for _, direction in ipairs(directions) do
 			if data[direction] then
@@ -219,19 +229,37 @@ local function convert_sprite_sheet_to_sprite_array(data, entity_bounding_box)
     end
 
     local line_length = data.line_length or data.variation_count or 1
+    local lines_per_file = data.lines_per_file or data.variation_count or 1
     local sprites = {}
     for i = 1, data.variation_count or 1 do
+        local row_index = math.floor((i - 1) / line_length)
+        local column_index = (i - 1) % line_length
+
+        local file_index = math.floor(row_index / lines_per_file)
+        local row_index_in_file = row_index % lines_per_file
+
+        -- Files are structured below each other
+        -- file1:
+        -- 0 1
+        -- 2 3
+        -- file2:
+        -- 4 5
+        -- 6 7
+
         --- @type data.SpriteSheet
         local sprite_sheet = table.deepcopy(data)
         sprite_sheet.layers = nil
         sprite_sheet.variation_count = nil
         sprite_sheet.repeat_count = nil
         sprite_sheet.line_length = nil
+        sprite_sheet.lines_per_file = nil
+        sprite_sheet.filenames = nil
 
         --- @type data.Sprite
         local sprite = sprite_sheet
+        sprite.filename = data.filename or data.filenames[file_index + 1]
 
-        process_sprite_parameters(sprite, entity_bounding_box, (i - 1) % line_length, math.floor((i - 1) / line_length))
+        process_sprite_parameters(sprite, entity_bounding_box, column_index, row_index_in_file)
         sprite.hr_version = data.hr_version and hr_sprites[i] or nil
 
         for j = 1, data.repeat_count or 1 do
@@ -261,7 +289,7 @@ end
 --- @param data data.SpriteVariations
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_rotated_sprite(data, entity_bounding_box)
-    error('Not implemented')
+    error(not_implemented_error_message)
 end
 
 -- Animations
@@ -275,14 +303,21 @@ local function convert_animation_parameters_to_stripes(data, entity_bounding_box
     process_sprite_parameters(data, entity_bounding_box)
     local sprite_bounding_box_pixels_2 = BoundingBox:from_sprite_parameters_pixels(data)
 
-    data.line_length = data.line_length or data.frame_count or 1
+    local lines_per_file = data.lines_per_file or data.frame_count or 1
+    local line_length = data.line_length or data.frame_count or 1
 
     local stripes = {}
     for i = 0, (data.frame_count or 1) - 1 do
+        local row_index = math.floor(i / line_length)
+        local column_index = i % line_length
+
+        local file_index = math.floor(row_index / lines_per_file)
+        local row_index_in_file = row_index % lines_per_file
+
         table.insert(stripes, {
-            filename = data.filename,
-            x = sprite_bounding_box_pixels_2.left_top.x + sprite_bounding_box_pixels.width * (i % data.line_length),
-            y = sprite_bounding_box_pixels_2.left_top.y + sprite_bounding_box_pixels.height * math.floor(i / data.line_length),
+            filename = data.filename or data.filenames[file_index + 1],
+            x = sprite_bounding_box_pixels_2.left_top.x + sprite_bounding_box_pixels.width * column_index,
+            y = sprite_bounding_box_pixels_2.left_top.y + sprite_bounding_box_pixels.height * row_index_in_file,
             width_in_frames = 1,
             height_in_frames = 1
         })
@@ -293,7 +328,9 @@ local function convert_animation_parameters_to_stripes(data, entity_bounding_box
     data.y = nil
     data.position = nil
     data.filename = nil
+    data.filenames = nil
     data.line_length = nil
+    data.lines_per_file = nil
 end
 
 --- https://lua-api.factorio.com/latest/types/Stripe.html
@@ -350,6 +387,10 @@ function process_functions.process_animation_1(data, entity_bounding_box)
         end
 
         if data.stripes then
+            if data.filenames or data.lines_per_file then
+                error(not_implemented_error_message)
+            end
+
             local stripes = {}
             for stripe_index, _ in ipairs(data.stripes) do
                 for _, new_stripe in ipairs(process_stripe(data, stripe_index, entity_bounding_box)) do
@@ -386,6 +427,9 @@ end
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_animation_4(data, entity_bounding_box)
     if data.north then
+        if data.north_east or data.south_east or data.south_west or data.north_west then
+            error(not_implemented_error_message)
+        end
         local directions = {
             'north',
             'south'
@@ -422,6 +466,10 @@ local function convert_animation_sheet_to_animation_array(data, entity_bounding_
 
     local animation_bounding_box_pixels = BoundingBox:from_sprite_parameters_pixels(data)
 
+    if data.filenames or data.lines_per_file then
+        error(not_implemented_error_message)
+    end
+
     local animations = {}
     for i = 1, data.variation_count do
         local data_copy = table.deepcopy(data)
@@ -456,14 +504,12 @@ function process_functions.process_animation_variation(data, entity_bounding_box
         end
 
         replace_table_content(data, animations)
-    else
-        if data[1] then
-            for _, animation in ipairs(data) do
-                process_functions.process_animation_1(animation, entity_bounding_box)
-            end
-        else
-            process_functions.process_animation_1(data, entity_bounding_box)
+    elseif data[1] then
+        for _, animation in ipairs(data) do
+            process_functions.process_animation_1(animation, entity_bounding_box)
         end
+    else
+        process_functions.process_animation_1(data, entity_bounding_box)
     end
 end
 
@@ -471,7 +517,7 @@ end
 --- @param data data.RotatedAnimation
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_rotated_animation(data, entity_bounding_box)
-    error('Not implemented')
+    error(not_implemented_error_message)
 end
 
 --- https://lua-api.factorio.com/latest/types/RotatedAnimation4Way.html
@@ -479,6 +525,9 @@ end
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_rotated_animation_4(data, entity_bounding_box)
     if data.north then
+        if data.north_east or data.south_east or data.south_west or data.north_west then
+            error(not_implemented_error_message)
+        end
         local directions = {
             'north',
             'south'
@@ -525,53 +574,7 @@ function process_functions.process_animation_element(data, entity_bounding_box)
     end
 end
 
---- https://lua-api.factorio.com/latest/types/BeamAnimationSet.html
---- @param data data.BeamAnimationSet
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_beam_animation_set(data, entity_bounding_box)
-    local directions = {
-        'start',
-        'ending',
-        'head',
-        'tail'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_animation_1(data[direction], entity_bounding_box)
-        end
-    end
-
-    if data.body then
-        process_functions.process_animation_variation(data.body, entity_bounding_box)
-    end
-end
-
---- https://lua-api.factorio.com/latest/prototypes/BoilerPrototype.html#structure
---- https://lua-api.factorio.com/latest/prototypes/BoilerPrototype.html#fire
---- https://lua-api.factorio.com/latest/prototypes/BoilerPrototype.html#fire_glow
---- @param data data.BoilerStructure | data.BoilerFire | data.BoilerFireGlow
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_boiler(data, entity_bounding_box)
-    local directions = {
-        'east',
-        'south'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_animation_1(data[direction], entity_bounding_box)
-        end
-    end
-
-    directions = {
-        'east',
-        'west'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_animation_1(data[direction], entity_bounding_box:rotate())
-        end
-    end
-end
+-- Graphic sets
 
 --- https://lua-api.factorio.com/latest/types/BeaconGraphicsSet.html
 --- @param data data.BeaconGraphicsSet
@@ -582,133 +585,124 @@ function process_functions.process_beacon_graphics_set(data, entity_bounding_box
             process_functions.process_animation_element(animation_element, entity_bounding_box)
         end
     end
+    if data.frozen_patch then
+        process_functions.process_sprite_1(data.frozen_patch, entity_bounding_box)
+    end
 end
 
---- https://lua-api.factorio.com/latest/types/CharacterArmorAnimation.html
---- @param data data.CharacterArmorAnimation
+--- https://lua-api.factorio.com/latest/prototypes/BoilerPrototype.html#pictures
+--- @param data data.BoilerPictureSet
 --- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_character_armor_animation(data, entity_bounding_box)
+function process_functions.process_boiler_picture_set(data, entity_bounding_box)
     local directions = {
-        'idle',
-        'idle_with_gun',
-        'running',
-        'running_with_gun',
-        'mining_with_tool',
-        'flipped_shadow_running_with_gun'
+        'north',
+        'south'
     }
     for _, direction in ipairs(directions) do
         if data[direction] then
-            process_functions.process_rotated_animation(data[direction], entity_bounding_box)
+            process_functions.process_boiler_pictures(data[direction], entity_bounding_box)
         end
     end
+
+    directions = {
+        'east',
+        'west'
+    }
+    for _, direction in ipairs(directions) do
+        if data[direction] then
+            process_functions.process_boiler_pictures(data[direction], entity_bounding_box:rotate())
+        end
+    end
+end
+
+--- https://lua-api.factorio.com/latest/types/BoilerPictures.html
+--- @param data data.BoilerPictures
+--- @param entity_bounding_box ExtendedBoundingBox
+function process_functions.process_boiler_pictures(data, entity_bounding_box)
+    process_functions.process_animation_1(data.structure, entity_bounding_box)
+    if data.fire then
+        process_functions.process_animation_1(data.fire, entity_bounding_box)
+    end
+    if data.fire_glow then
+        process_functions.process_animation_1(data.fire_glow, entity_bounding_box)
+    end
+end
+
+--- https://lua-api.factorio.com/latest/types/ChargableGraphics.html
+--- @param data data.ChargableGraphics
+--- @param entity_bounding_box ExtendedBoundingBox
+function process_functions.process_chargable_graphics(data, entity_bounding_box)
+    if data.picture then
+        process_functions.process_sprite_1(data.picture, entity_bounding_box)
+    end
+    if data.charge_animation then
+        process_functions.process_animation_1(data.charge_animation, entity_bounding_box)
+    end
+    if data.discharge_animation then
+        process_functions.process_animation_1(data.discharge_animation, entity_bounding_box)
+    end
+end
+
+--- https://lua-api.factorio.com/latest/types/CraftingMachineGraphicsSet.html
+--- @param data data.CraftingMachineGraphicsSet
+--- @param entity_bounding_box ExtendedBoundingBox
+function process_functions.process_crafting_machine_graphics_set(data, entity_bounding_box)
+    if data.frozen_patch then
+        process_functions.process_sprite_4(data.frozen_patch, entity_bounding_box)
+    end
+    process_functions.process_working_visualisations(data, entity_bounding_box)
 end
 
 --- https://lua-api.factorio.com/latest/types/MiningDrillGraphicsSet.html
 --- @param data data.MiningDrillGraphicsSet
 --- @param entity_bounding_box ExtendedBoundingBox
 function process_functions.process_mining_drill_graphics_set(data, entity_bounding_box)
-	if data.animation then
-        process_functions.process_animation_4(data.animation, entity_bounding_box)
+    if data.frozen_patch then
+        process_functions.process_sprite_4(data.frozen_patch, entity_bounding_box)
     end
-
-	if data.idle_animation then
-        process_functions.process_animation_4(data.idle_animation, entity_bounding_box)
-    end
-
-    if data.working_visualisations then
-        process_functions.process_working_visualisations(data.working_visualisations, entity_bounding_box)
-    end
-end
-
---- https://lua-api.factorio.com/latest/types/PumpConnectorGraphicsAnimation.html
---- @param data data.PumpConnectorGraphicsAnimation
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_pump_connector_graphics_animation(data, entity_bounding_box)
-    local directions = {
-        'startup_base',
-        'startup_top',
-        'startup_shadow',
-        'connector',
-        'connector_shadow'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_animation_1(data[direction], entity_bounding_box)
-        end
-    end
-end
-
---- https://lua-api.factorio.com/latest/types/SpiderVehicleGraphicsSet.html
---- @param data data.SpiderVehicleGraphicsSet
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_spider_vehicle_graphics_set(data, entity_bounding_box)
-    local directions = {
-        'base_animation',
-        'shadow_base_animation',
-        'animation',
-        'shadow_animation'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_rotated_animation(data[direction], entity_bounding_box)
-        end
-    end
-
-    directions = {
-        'autopilot_destination_on_map_visualisation',
-        'autopilot_destination_queue_on_map_visualisation',
-        'autopilot_destination_visualisation',
-        'autopilot_destination_queue_visualisation'
-    }
-    for _, direction in ipairs(directions) do
-        if data[direction] then
-            process_functions.process_animation_1(data[direction], entity_bounding_box)
-        end
-    end
+    process_functions.process_working_visualisations(data, entity_bounding_box)
 end
 
 --- https://lua-api.factorio.com/latest/prototypes/StorageTankPrototype.html#pictures
 --- @param data data.StorageTankPictures
 --- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_storage_tank(data, entity_bounding_box)
-    process_functions.process_sprite_4(data.picture, entity_bounding_box)
-    process_functions.process_sprite_1(data.window_background, entity_bounding_box)
-    process_functions.process_sprite_1(data.fluid_background, entity_bounding_box)
-    process_functions.process_sprite_1(data.flow_sprite, entity_bounding_box)
-    process_functions.process_animation_1(data.gas_flow, entity_bounding_box)
-end
-
---- https://lua-api.factorio.com/latest/types/TransportBeltAnimationSet.html
---- https://lua-api.factorio.com/latest/types/TransportBeltAnimationSetWithCorners.html
---- @param data data.TransportBeltAnimationSet
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_transport_belt_animation_set(data, entity_bounding_box)
-    process_functions.process_rotated_animation(data.animation_set, entity_bounding_box)
-    if data.ending_patch then
-        process_functions.process_sprite_4(data.ending_patch, entity_bounding_box)
+--- @param entity data.StorageTankPrototype
+function process_functions.process_storage_tank(data, entity_bounding_box, entity)
+    if data.picture then
+        process_functions.process_sprite_4(data.picture, entity_bounding_box)
+    end
+    if data.frozen_patch then
+        process_functions.process_sprite_4(data.frozen_patch, entity_bounding_box)
+    end
+    local window_bounding_box = BoundingBox:from_bounding_box(entity.window_bounding_box)
+    if data.window_background then
+        process_functions.process_sprite_1(data.window_background, window_bounding_box)
+    end
+    if data.fluid_background then
+        process_functions.process_sprite_1(data.fluid_background, window_bounding_box)
+    end
+    if data.flow_sprite then
+        process_functions.process_sprite_1(data.flow_sprite, window_bounding_box)
+    end
+    if data.gas_flow then
+        process_functions.process_animation_1(data.gas_flow, window_bounding_box)
     end
 end
 
---- @param animation data.Animation
---- @param shift Vector
-function move_animation(animation, shift)
-    if animation.layers then
-        for _, layer in ipairs(animation.layers) do
-            layer.shift = layer.shift or {0, 0}
-            layer.shift = {
-                (layer.shift[1] or layer.shift.x) + (shift[1] or shift.x),
-                (layer.shift[2] or layer.shift.y) + (shift[2] or shift.y)
-            }
+--- https://lua-api.factorio.com/latest/types/WorkingVisualisations.html
+--- @param data data.WorkingVisualisations
+--- @param entity_bounding_box ExtendedBoundingBox
+function process_functions.process_working_visualisations(data, entity_bounding_box)
+    if data.animation then
+        process_functions.process_animation_4(data.animation, entity_bounding_box)
+    end
+    if data.idle_animation then
+        process_functions.process_animation_4(data.idle_animation, entity_bounding_box)
+    end
+    if data.working_visualisations then
+        for _, visualisation in ipairs(data.working_visualisations) do
+            process_functions.process_working_visualisation(visualisation, entity_bounding_box)
         end
-    else
-        if animation.hr_version then
-            move_animation(animation.hr_version, shift)
-        end
-        animation.shift = animation.shift or {0, 0}
-        animation.shift = {
-            (animation.shift[1] or animation.shift.x) + (shift[1] or shift.x),
-            (animation.shift[2] or animation.shift.y) + (shift[2] or shift.y)
-        }
     end
 end
 
@@ -735,12 +729,26 @@ function process_functions.process_working_visualisation(data, entity_bounding_b
     end
 end
 
---- https://lua-api.factorio.com/latest/types/WorkingVisualisation.html
---- @param data data.WorkingVisualisation[]
---- @param entity_bounding_box ExtendedBoundingBox
-function process_functions.process_working_visualisations(data, entity_bounding_box)
-    for _, visualisation in ipairs(data) do
-        process_functions.process_working_visualisation(visualisation, entity_bounding_box)
+--- @param animation data.Animation
+--- @param shift Vector
+function move_animation(animation, shift)
+    if animation.layers then
+        for _, layer in ipairs(animation.layers) do
+            layer.shift = layer.shift or {0, 0}
+            layer.shift = {
+                (layer.shift[1] or layer.shift.x) + (shift[1] or shift.x),
+                (layer.shift[2] or layer.shift.y) + (shift[2] or shift.y)
+            }
+        end
+    else
+        if animation.hr_version then
+            move_animation(animation.hr_version, shift)
+        end
+        animation.shift = animation.shift or {0, 0}
+        animation.shift = {
+            (animation.shift[1] or animation.shift.x) + (shift[1] or shift.x),
+            (animation.shift[2] or animation.shift.y) + (shift[2] or shift.y)
+        }
     end
 end
 

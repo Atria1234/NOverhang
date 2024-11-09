@@ -18,7 +18,7 @@ local function process_entity_type(entity_type, properties, rotate_bounding_box)
 
                 for property_name, process_function in pairs(properties) do
                     if entity[property_name] then
-                        process_function(entity[property_name], entity_bounding_box)
+                        process_function(entity[property_name], entity_bounding_box, entity)
                     end
                 end
             end
@@ -27,14 +27,11 @@ local function process_entity_type(entity_type, properties, rotate_bounding_box)
 end
 
 process_entity_type('accumulator', {
-    picture = processing.process_sprite_1,
-    charge_animation = processing.process_animation_1,
-    discharge_animation = processing.process_animation_1
+    chargable_graphics = processing.process_chargable_graphics
 })
 process_entity_type('assembling-machine', {
-    animation = processing.process_animation_4,
-    idle_animation = processing.process_animation_4,
-    working_visualisations = processing.process_working_visualisations
+    graphics_set = processing.process_crafting_machine_graphics_set,
+    graphics_set_flipped = processing.process_crafting_machine_graphics_set
 })
 process_entity_type('beacon', {
     animation = processing.process_animation_1,
@@ -42,34 +39,33 @@ process_entity_type('beacon', {
     graphics_set = processing.process_beacon_graphics_set
 })
 process_entity_type('boiler', {
-    structure = processing.process_animation_4,
-    fire = processing.process_boiler,
-    fire_glow = processing.process_boiler
+    pictures = processing.process_boiler_picture_set
 })
 process_entity_type('burner-generator', {
     animation = processing.process_animation_4,
     idle_animation = processing.process_animation_4
 })
 process_entity_type('furnace', {
-    animation = processing.process_animation_4,
-    idle_animation = processing.process_animation_4,
-    working_visualisations = processing.process_working_visualisations
+    graphics_set = processing.process_crafting_machine_graphics_set,
+    graphics_set_flipped = processing.process_crafting_machine_graphics_set
 })
 process_entity_type('generator', {
-    vertical_animation = processing.process_animation_1
+    vertical_animation = processing.process_animation_1,
+    vertical_frozen_patch = processing.process_sprite_1
 })
 process_entity_type('generator', {
-    horizontal_animation = processing.process_animation_1
+    horizontal_animation = processing.process_animation_1,
+    horizontal_frozen_patch = processing.process_sprite_1
 }, true)
 process_entity_type('lab', {
     on_animation = processing.process_animation_1,
-    off_animation = processing.process_animation_1
+    off_animation = processing.process_animation_1,
+    frozen_patch = processing.process_sprite_1
 })
 process_entity_type('mining-drill', {
-    base_picture = processing.process_sprite_4,
-    animations = processing.process_animation_4,
     graphics_set = processing.process_mining_drill_graphics_set,
-    wet_mining_graphics_set = processing.process_mining_drill_graphics_set
+    wet_mining_graphics_set = processing.process_mining_drill_graphics_set,
+    base_picture = processing.process_sprite_4
 })
 process_entity_type('reactor', {
     picture = processing.process_sprite_1
@@ -77,6 +73,7 @@ process_entity_type('reactor', {
 process_entity_type('roboport', {
     base = processing.process_sprite_1,
     base_patch = processing.process_sprite_1,
+    frozen_patch = processing.process_sprite_1,
     base_animation = processing.process_animation_1,
     door_animation_up = processing.process_animation_1,
     door_animation_down = processing.process_animation_1,
