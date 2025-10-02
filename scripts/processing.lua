@@ -41,39 +41,60 @@ local process_functions = {}
 --- @param index_x integer | nil
 --- @param index_y integer | nil
 local function process_sprite_parameters(data, entity_bounding_box, index_x, index_y)
-	local sprite_bounding_box_pixels = BoundingBox:from_sprite_parameters_pixels(data)
-	local sprite_bounding_box_tiles = BoundingBox:from_sprite_parameters_tiles(data)
-	local intersection_tiles = overhangs(data, entity_bounding_box)
+    if settings.startup["NOverhang_toggle_opacity"].value == false then 
+        local sprite_bounding_box_pixels = BoundingBox:from_sprite_parameters_pixels(data)
+        local sprite_bounding_box_tiles = BoundingBox:from_sprite_parameters_tiles(data)
+        local intersection_tiles = overhangs(data, entity_bounding_box)
 
-	if intersection_tiles == false then
-		return
-	end
+        if intersection_tiles == false then
+            return
+        end
 
-    if intersection_tiles == nil then
-        data.tint = {0, 0, 0, 0}
-        return
+        if intersection_tiles == nil then
+            data.tint = {0, 0, 0, 0}
+            return
+        end
+
+        data.position = {
+            sprite_bounding_box_pixels.left_top.x +
+            pixel_utils.tiles_to_pixels(intersection_tiles.left_top.x - sprite_bounding_box_tiles.left_top.x, data.scale) +
+            (index_x or 0) * sprite_bounding_box_pixels.width,
+
+            sprite_bounding_box_pixels.left_top.y +
+            pixel_utils.tiles_to_pixels(intersection_tiles.left_top.y - sprite_bounding_box_tiles.left_top.y, data.scale) +
+            (index_y or 0) * sprite_bounding_box_pixels.height
+        }
+        data.x = nil
+        data.y = nil
+
+        data.size = {
+            pixel_utils.tiles_to_pixels(intersection_tiles.width, data.scale),
+            pixel_utils.tiles_to_pixels(intersection_tiles.height, data.scale)
+        }
+        data.width = nil
+        data.height = nil
+
+        data.shift = intersection_tiles.center
+    else 
+        local intersection_tiles = overhangs(data, entity_bounding_box)
+        local alpha = settings.startup["NOverhang_opacity_strength"].value * 0.01
+
+        if intersection_tiles ~= false then
+            local t = data.tint
+            if t then
+                if t[1] then
+                    local r, g, b, a = t[1], t[2], t[3], t[4] or 1
+                    data.tint = { r = r, g = g, b = b, a = a * alpha }
+                else
+                    t.a = (t.a or 1) * alpha
+                    data.tint = t
+                end
+            else
+                data.tint = { r = 1, g = 1, b = 1, a = alpha }
+            end
+            return
+        end
     end
-
-    data.position = {
-        sprite_bounding_box_pixels.left_top.x +
-        pixel_utils.tiles_to_pixels(intersection_tiles.left_top.x - sprite_bounding_box_tiles.left_top.x, data.scale) +
-        (index_x or 0) * sprite_bounding_box_pixels.width,
-
-        sprite_bounding_box_pixels.left_top.y +
-        pixel_utils.tiles_to_pixels(intersection_tiles.left_top.y - sprite_bounding_box_tiles.left_top.y, data.scale) +
-        (index_y or 0) * sprite_bounding_box_pixels.height
-    }
-    data.x = nil
-    data.y = nil
-
-    data.size = {
-        pixel_utils.tiles_to_pixels(intersection_tiles.width, data.scale),
-        pixel_utils.tiles_to_pixels(intersection_tiles.height, data.scale)
-    }
-    data.width = nil
-    data.height = nil
-
-    data.shift = intersection_tiles.center
 end
 
 --- https://lua-api.factorio.com/latest/types/Sprite.html
