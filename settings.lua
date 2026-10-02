@@ -1,5 +1,16 @@
 require('init')
 
+data:extend({
+	{
+		name = NOverhang.allowed_overhang_setting_name,
+		type = 'double-setting',
+		setting_type = 'startup',
+		default_value = 0,
+		minimum_value = 0,
+		order = '00'
+	}
+})
+
 for i, entity_type in ipairs(NOverhang.entity_types) do
 	data:extend({
 		{

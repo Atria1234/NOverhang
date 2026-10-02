@@ -32,6 +32,14 @@ NOverhang.entity_types = {
     'storage-tank'
 }
 
+NOverhang.allowed_overhang_setting_name = NOverhang.mod_name..'__allowed-overhang'
+
+--- @return float
+function NOverhang.allowed_overhang()
+    local setting = settings.startup[NOverhang.allowed_overhang_setting_name]
+    return setting and setting.value or 0
+end
+
 --- @param entity_type SupportedEntityType
 function NOverhang.process_setting_name(entity_type)
     return NOverhang.mod_name..'__process-'..entity_type

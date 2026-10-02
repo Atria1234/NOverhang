@@ -115,6 +115,18 @@ function extended_bounding_box:from_dimensions(center, size)
 end
 
 --- @param self ExtendedBoundingBox
+--- @param margin float
+--- @return ExtendedBoundingBox
+function extended_bounding_box:expand(margin)
+    return self:from_values(
+        self.left_top.x - margin,
+        self.left_top.y - margin,
+        self.width + 2 * margin,
+        self.height + 2 * margin
+    )
+end
+
+--- @param self ExtendedBoundingBox
 --- @param other ExtendedBoundingBox
 --- @return boolean
 function extended_bounding_box:contains_box(other)

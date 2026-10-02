@@ -2,6 +2,8 @@ require('init')
 local BoundingBox = require('scripts.bounding-box')
 local processing = require('scripts.processing')
 
+local allowed_overhang = NOverhang.allowed_overhang()
+
 --- @param entity_type SupportedEntityType
 --- @param properties { [string]: function }
 --- @param rotate_bounding_box boolean | nil
@@ -11,7 +13,7 @@ local function process_entity_type(entity_type, properties, rotate_bounding_box)
         for name, entity in pairs(data.raw[entity_type]) do
             if not exclude[name] and entity.selection_box then
                 log('Processing type: "'..entity_type..'", name: "'..name..'"')
-                local entity_bounding_box = BoundingBox:from_bounding_box(entity.selection_box)
+                local entity_bounding_box = BoundingBox:from_bounding_box(entity.selection_box):expand(allowed_overhang)
                 if rotate_bounding_box then
                     entity_bounding_box = entity_bounding_box:rotate()
                 end
